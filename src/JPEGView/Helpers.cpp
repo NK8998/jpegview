@@ -1,6 +1,8 @@
 #include "StdAfx.h"
 #include "Helpers.h"
-#include "immintrin.h"
+#if defined(_M_IX86) || defined(_M_X64)
+#include <immintrin.h>
+#endif
 #include "NLS.h"
 #include "MultiMonitorSupport.h"
 #include "JPEGImage.h"
@@ -176,7 +178,7 @@ void GetZoomParameters(float & fZoom, CPoint & offsets, CSize imageSize, CSize w
 	offsets = CPoint(nOffsetX, nOffsetY);
 }
 
-#ifdef _WIN64
+#if defined(_M_X64)
 static CPUType ProbeSSEorAVX2() {
 	__try {
 		// check if CPU supports AVX and the xgetbv instruction
@@ -209,9 +211,9 @@ CPUType ProbeCPU(void) {
 		return cpuType;
 	}
 
-#ifdef _WIN64
+#if defined(_M_X64)
 	return ProbeSSEorAVX2(); // 64 bit always supports at least SSE
-#else
+#elif defined(_M_IX86)
 	// Structured exception handling is mandatory, try/catch(...) does not catch such severe stuff.
 	cpuType = CPU_Generic;
 	__try {
@@ -248,18 +250,28 @@ GiveUp:
 		return cpuType;
 	}
 	return cpuType;
+#else
+	// TODO(arm64): add architecture-specific feature detection before introducing NEON paths.
+	cpuType = CPU_Generic;
+	return cpuType;
 #endif
 }
 
 // returns if the CPU supports some form of hardware multiprocessing, e.g. hyperthreading or multicore
 static bool CPUSupportsHWMultiprocessing(void) {   
+#if defined(_M_IX86) || defined(_M_X64)
 	if (ProbeCPU() >= CPU_SSE) {
 		int output[4];
 		__cpuid(output, 1);
 		return (output[3] & 0x10000000);
 	} else {
 		return false;
-	}  
+	}
+#else
+	SYSTEM_INFO systemInfo;
+	GetSystemInfo(&systemInfo);
+	return systemInfo.dwNumberOfProcessors > 1;
+#endif
 }
 
 int NumCoresPerPhysicalProc(void) {
@@ -267,8 +279,8 @@ int NumCoresPerPhysicalProc(void) {
 		return 1;
 	}
 
+#if defined(_M_IX86) || defined(_M_X64)
 	int output[4];
-
 	// check if cpuid supports leaf 4
 	__cpuid(output, 0);
 	if (output[0] < 4)
@@ -278,6 +290,12 @@ int NumCoresPerPhysicalProc(void) {
 	__cpuidex(output, 4, 0);
 
 	return (int)((output[0] & 0xFC000000) >> 26) + 1;
+#else
+	// TODO(arm64): distinguish physical cores from logical processors.
+	SYSTEM_INFO systemInfo;
+	GetSystemInfo(&systemInfo);
+	return (int)systemInfo.dwNumberOfProcessors;
+#endif
 }
 
 bool PatternMatch(LPCTSTR & sMatchingPattern, LPCTSTR sString, LPCTSTR sPattern) {

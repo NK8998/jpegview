@@ -5,7 +5,7 @@
 #include "Helpers.h"
 #include "WorkThread.h"
 #include "ProcessingThreadPool.h"
-#ifdef _WIN64
+#if defined(_M_X64)
 #include "ApplyFilterAVX.h"
 #endif
 #include <math.h>
@@ -1886,7 +1886,7 @@ static void* RotateToDIB(const CXMMImage* pSourceImg, int simdPixelsPerRegister,
 // High quality filtering (SSE implementation)
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef _WIN64
+#if defined(_M_X64)
 // Apply filter in y direction in SSE
 // No inline assembly is supported in 64 bit mode, thus intrinsics are used instead.
 // nSourceHeight: Height of source image, only here to match interface of C++ implementation
@@ -2006,7 +2006,7 @@ static CXMMImage* ApplyFilter_SSE(int nSourceHeight, int nTargetHeight, int nWid
 	return tempImage;
 }
 
-#else
+#elif defined(_M_IX86)
 // Apply filter in y direction in SSE
 // nSourceHeight: Height of source image, only here to match interface of C++ implementation
 // nTargetHeight: Height of target image after resampling
@@ -2161,13 +2161,25 @@ CXMMImage* ApplyFilter_AVX(int nSourceHeight, int nTargetHeight, int nWidth,
 	return NULL;
 }
 
+#else
+// TODO(arm64): replace these bring-up stubs with NEON or architecture-neutral SIMD filters.
+static CXMMImage* ApplyFilter_SSE(int, int, int, int, int, int,
+	const XMMFilterKernelBlock&, int, const CXMMImage*) {
+	return NULL;
+}
+
+CXMMImage* ApplyFilter_AVX(int, int, int, int, int, int,
+	const AVXFilterKernelBlock&, int, const CXMMImage*) {
+	return NULL;
+}
+
 #endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // High quality filtering (MMX implementation)
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef _WIN64
+#if !defined(_M_IX86)
 // Not used in 64 bit - uses always SSE version for 64 bit
 static CXMMImage* ApplyFilter_MMX(int nSourceHeight, int nTargetHeight, int nWidth,
 	int nStartY_FP, int nStartX, int nIncrementY_FP,

@@ -18,7 +18,7 @@ IF /I "%~4" EQU "" (
 REM ----------- VARIABLES FROM Visual Studio -----------
 REM these match the order in the call from post-build event
 
-REM 32 or 64
+REM Win32, x64, ARM64, or legacy 32/64
 SET PLATFORM_ARCHITECTURE=%~1
 
 REM base name of the project, to detect if we're building the VS2017 version
@@ -52,7 +52,7 @@ echo ~ ErrorLevel: %ErrorLevel%
 
 
 REM ----------- COPY DLL FILES -----------
-REM qbnu standardized JPEGView's DLL structure which puts DLLs in either the bin (32-bit) or bin64 (64-bit) folders
+REM qbnu standardized JPEGView's DLL structure by target architecture.
 
 IF /I "%PROJECT_NAME%" EQU "JPEGView_VS2017" (
 	REM specifically for VS2017:  Currently, VS2017 project file is used to build the XP-version ONLY
@@ -84,8 +84,13 @@ SET DEP_NAME=%~1
 REM set default as 32-bit version
 SET SRC_DIR=%PROJECT_DIR%%DEP_NAME%\bin
 IF /I "%PLATFORM_ARCHITECTURE%" EQU "64" (
-	REM append "64" to the 32-bit version path
-	SET SRC_DIR=%SRC_DIR%%PLATFORM_ARCHITECTURE%
+	SET SRC_DIR=%SRC_DIR%64
+)
+IF /I "%PLATFORM_ARCHITECTURE%" EQU "x64" (
+	SET SRC_DIR=%SRC_DIR%64
+)
+IF /I "%PLATFORM_ARCHITECTURE%" EQU "ARM64" (
+	SET SRC_DIR=%SRC_DIR%arm64
 )
 
 echo + XCopy %PLATFORM_ARCHITECTURE%-bit DLLs for "%DEP_NAME%" if needed ...
