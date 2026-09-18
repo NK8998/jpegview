@@ -27,6 +27,7 @@ static TCHAR s_TimingInfo[256];
 // Processing images stripwise on thread pool
 /////////////////////////////////////////////////////////////////////////////////////////////
 
+#if defined(_M_IX86) || defined(_M_X64)
 static void* SampleDown_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
 	CSize sourceSize, const void* pIJLPixels, int nChannels, double dSharpen,
 	EFilterType eFilter, bool bSSE, uint8* pTarget);
@@ -42,6 +43,7 @@ static void* SampleUp_HQ_MMX_SSE_Core(CSize fullTargetSize, CPoint fullTargetOff
 static void* SampleUp_HQ_AVX_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize clippedTargetSize,
 	CSize sourceSize, const void* pIJLPixels, int nChannels,
 	uint8* pTarget);
+#endif
 
 static void* ApplyLDC32bpp_Core(CSize fullTargetSize, CPoint fullTargetOffset, CSize dibSize,
 	CSize ldcMapSize, const void* pDIBPixels, const int32* pSatLUTs, const uint8* pLUT, const uint8* pLDCMap,
@@ -62,6 +64,7 @@ static void* TrapezoidHQ_Core(CPoint targetOffset, CSize targetSize, const CTrap
 //---------------------------------------------------------------------------------------------
 
 // Request for upsampling or downsampling
+#if defined(_M_IX86) || defined(_M_X64)
 class CRequestUpDownSampling : public CProcessingRequest {
 public:
 	CRequestUpDownSampling(const void* pSourcePixels, CSize sourceSize, void* pTargetPixels,
@@ -115,6 +118,7 @@ public:
 	EFilterType Filter;
 	CBasicProcessing::SIMDArchitecture SIMD;
 };
+#endif
 
 class CRequestLDC : public CProcessingRequest {
 public:
@@ -1886,6 +1890,8 @@ static void* RotateToDIB(const CXMMImage* pSourceImg, int simdPixelsPerRegister,
 // High quality filtering (SSE implementation)
 /////////////////////////////////////////////////////////////////////////////////////////////
 
+#if defined(_M_IX86) || defined(_M_X64)
+
 #if defined(_M_X64)
 // Apply filter in y direction in SSE
 // No inline assembly is supported in 64 bit mode, thus intrinsics are used instead.
@@ -2160,19 +2166,6 @@ CXMMImage* ApplyFilter_AVX(int nSourceHeight, int nTargetHeight, int nWidth,
 	// not supported in 32 bit
 	return NULL;
 }
-
-#else
-// TODO(arm64): replace these bring-up stubs with NEON or architecture-neutral SIMD filters.
-static CXMMImage* ApplyFilter_SSE(int, int, int, int, int, int,
-	const XMMFilterKernelBlock&, int, const CXMMImage*) {
-	return NULL;
-}
-
-CXMMImage* ApplyFilter_AVX(int, int, int, int, int, int,
-	const AVXFilterKernelBlock&, int, const CXMMImage*) {
-	return NULL;
-}
-
 #endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -2599,6 +2592,8 @@ void* CBasicProcessing::SampleUp_HQ_SIMD(CSize fullTargetSize, CPoint fullTarget
 
 	return bSuccess ? pTarget : NULL;
 }
+
+#endif
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // Unsharp mask

@@ -137,6 +137,9 @@ CSettingsProvider::CSettingsProvider(void) {
 	else {
 		m_eCPUAlgorithm = Helpers::ProbeCPU();
 	}
+#if defined(_M_ARM64) || defined(_M_ARM64EC)
+	m_eCPUAlgorithm = Helpers::CPU_Generic;
+#endif
 	m_nNumCores = GetInt(_T("CPUCoresUsed"), 0, 0, 4);
 	if (m_nNumCores == 0) {
 		m_nNumCores = Helpers::NumCoresPerPhysicalProc();

@@ -251,7 +251,6 @@ GiveUp:
 	}
 	return cpuType;
 #else
-	// TODO(arm64): add architecture-specific feature detection before introducing NEON paths.
 	cpuType = CPU_Generic;
 	return cpuType;
 #endif
@@ -290,8 +289,54 @@ int NumCoresPerPhysicalProc(void) {
 	__cpuidex(output, 4, 0);
 
 	return (int)((output[0] & 0xFC000000) >> 26) + 1;
+#elif defined(_M_ARM64) || defined(_M_ARM64EC)
+	typedef BOOL(WINAPI* GetLogicalProcessorInformationExFunc)(
+		LOGICAL_PROCESSOR_RELATIONSHIP,
+		PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX,
+		PDWORD);
+	GetLogicalProcessorInformationExFunc getLogicalProcessorInformationEx =
+		(GetLogicalProcessorInformationExFunc)::GetProcAddress(
+			::GetModuleHandle(_T("kernel32.dll")), "GetLogicalProcessorInformationEx");
+	if (getLogicalProcessorInformationEx == NULL) {
+		SYSTEM_INFO systemInfo;
+		GetSystemInfo(&systemInfo);
+		return max(1, (int)systemInfo.dwNumberOfProcessors);
+	}
+
+	DWORD bufferSize = 0;
+	if (getLogicalProcessorInformationEx(RelationProcessorCore, NULL, &bufferSize) ||
+		::GetLastError() != ERROR_INSUFFICIENT_BUFFER || bufferSize == 0) {
+		return 1;
+	}
+
+	uint8* buffer = new(std::nothrow) uint8[bufferSize];
+	if (buffer == NULL) {
+		return 1;
+	}
+
+	if (!getLogicalProcessorInformationEx(RelationProcessorCore,
+		(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)buffer, &bufferSize)) {
+		delete[] buffer;
+		return 1;
+	}
+
+	int numberOfCores = 0;
+	uint8* current = buffer;
+	uint8* end = buffer + bufferSize;
+	while (current < end) {
+		PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX info =
+			(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)current;
+		if (info->Size == 0 || current + info->Size > end) {
+			break;
+		}
+		if (info->Relationship == RelationProcessorCore) {
+			numberOfCores++;
+		}
+		current += info->Size;
+	}
+	delete[] buffer;
+	return max(1, numberOfCores);
 #else
-	// TODO(arm64): distinguish physical cores from logical processors.
 	SYSTEM_INFO systemInfo;
 	GetSystemInfo(&systemInfo);
 	return (int)systemInfo.dwNumberOfProcessors;

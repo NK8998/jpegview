@@ -602,6 +602,7 @@ void* CJPEGImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targ
 
 	if (GetProcessingFlag(eProcFlags, PFLAG_HighQualityResampling) && 
 		!(eResizeType == NoResize && (filter == Filter_Downsampling_Best_Quality || filter == Filter_Downsampling_No_Aliasing))) {
+#if defined(_M_IX86) || defined(_M_X64)
 		if (SupportsSIMD(cpu)) {
 			if (eResizeType == UpSample) {
 				return CBasicProcessing::SampleUp_HQ_SIMD(fullTargetSize, targetOffset, clippingSize, 
@@ -619,6 +620,15 @@ void* CJPEGImage::Resample(CSize fullTargetSize, CSize clippingSize, CPoint targ
 					CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, dSharpen, filter);
 			}
 		}
+#else
+		if (eResizeType == UpSample) {
+			return CBasicProcessing::SampleUp_HQ(fullTargetSize, targetOffset, clippingSize,
+				CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels);
+		} else {
+			return CBasicProcessing::SampleDown_HQ(fullTargetSize, targetOffset, clippingSize,
+				CSize(m_nOrigWidth, m_nOrigHeight), m_pOrigPixels, m_nOriginalChannels, dSharpen, filter);
+		}
+#endif
 	} else {
 		bool bHasRotation = fabs(dRotation) > 1e-3;
 		if (bHasRotation) {
@@ -642,6 +652,7 @@ void* CJPEGImage::InternalResize(void* pixels, int channels, EResizeFilter filte
 	EFilterType downSamplingFilter = (filter == Resize_NoAliasing) ? Filter_Downsampling_No_Aliasing : Filter_Downsampling_Best_Quality;
 	double dSharpen = (filter == Resize_SharpenLow) ? 0.15 : (filter == Resize_SharpenMedium) ? 0.3 : 0.0;
 
+#if defined(_M_IX86) || defined(_M_X64)
 	if (SupportsSIMD(cpu)) {
 		if (eResizeType == UpSample) {
 			return CBasicProcessing::SampleUp_HQ_SIMD(targetSize, CPoint(0, 0), targetSize,
@@ -659,6 +670,15 @@ void* CJPEGImage::InternalResize(void* pixels, int channels, EResizeFilter filte
 				sourceSize, pixels, channels, dSharpen, downSamplingFilter);
 		}
 	}
+#else
+	if (eResizeType == UpSample) {
+		return CBasicProcessing::SampleUp_HQ(targetSize, CPoint(0, 0), targetSize,
+			sourceSize, pixels, channels);
+	} else {
+		return CBasicProcessing::SampleDown_HQ(targetSize, CPoint(0, 0), targetSize,
+			sourceSize, pixels, channels, dSharpen, downSamplingFilter);
+	}
+#endif
 }
 
 CPoint CJPEGImage::ConvertOffset(CSize fullTargetSize, CSize clippingSize, CPoint targetOffset) {
@@ -1517,4 +1537,3 @@ void CJPEGImage::DrawGridLines(void * pDIB, const CSize& dibSize) {
 		}
 	}
 }
-
