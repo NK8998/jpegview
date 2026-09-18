@@ -102,7 +102,7 @@ bool CProcessingThreadPool::Process(CProcessingRequest* pRequest) {
 			::WaitForSingleObject(eventFinished, INFINITE);
 			::CloseHandle(eventFinished);
 			for (int i = 0; i < nNumThreadsUsed-1; i++) {
-				pAllWrappedRequests[i]->Deleted = true; // thread pool threads will remove the requests from the queue
+				pAllWrappedRequests[i]->Deleted.store(true, std::memory_order_release); // thread pool threads will remove the requests from the queue
 			}
 			delete [] pAllWrappedRequests;
 		}
@@ -151,4 +151,3 @@ void CProcessingThread::ProcessRequest(CRequestBase& request) {
 	CWrappedRequest* pWrappedRequest = (CWrappedRequest*)&request;
 	DoProcess(pWrappedRequest->InnerRequest, pWrappedRequest->Offset, pWrappedRequest->SizeY);
 }
-

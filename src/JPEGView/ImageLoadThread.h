@@ -49,7 +49,7 @@ public:
 	void ReleaseFile(LPCTSTR strFileName);
 
 	// Gets the request handle value used for the last request
-	static int GetCurHandleValue() { return m_curHandle; }
+	static int GetCurHandleValue() { return m_curHandle.load(std::memory_order_relaxed); }
 
 private:
 
@@ -61,7 +61,7 @@ private:
 			FileName = strFileName;
 			FrameIndex = nFrameIndex;
 			TargetWnd = wndTarget;
-			RequestHandle = ::InterlockedIncrement((LONG*)&m_curHandle);
+			RequestHandle = m_curHandle.fetch_add(1, std::memory_order_relaxed) + 1;
 			Image = NULL;
 			OutOfMemory = false;
 			ExceptionError = false;
@@ -90,7 +90,7 @@ private:
 		CString FileName;
 	};
 
-	static volatile int m_curHandle; // Request handle returned by AsyncLoad()
+	static std::atomic<int> m_curHandle; // Request handle returned by AsyncLoad()
 
 	Gdiplus::Bitmap* m_pLastBitmap; // Last read GDI+ bitmap, cached to speed up GIF animations
 	CString m_sLastFileName; // Only for GDI+ files

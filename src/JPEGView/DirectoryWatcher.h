@@ -22,7 +22,6 @@ private:
 	HANDLE m_newDirectoryEvent; // New directory needs to be watched
 	HANDLE m_hThread; // watchdog thread
 	HWND m_hTargetWindow;
-	bool m_bTerminate;
 
 	CString m_sCurrentDirectory;
 	CString m_sCurrentFile;

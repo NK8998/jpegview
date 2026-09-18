@@ -19,7 +19,7 @@ CWorkThread::CWorkThread(bool bCoInitialize)
 }
 
 CWorkThread::~CWorkThread(void) {
-	if (!m_bTerminate) {
+	if (!m_bTerminate.load(std::memory_order_acquire)) {
 		Terminate();
 	}
 	::DeleteCriticalSection(&m_csList);
@@ -38,7 +38,7 @@ void CWorkThread::ProcessAndWait(CRequestBase* pRequest) {
 	if (bCreateEvent) {
 		::CloseHandle(pRequest->EventFinished);
 	}
-	pRequest->Deleted = true; // make sure the request is removed from the queue
+	pRequest->Deleted.store(true, std::memory_order_release); // make sure the request is removed from the queue
 }
 
 void CWorkThread::ProcessAsync(CRequestBase* pRequest) {
@@ -51,7 +51,7 @@ void CWorkThread::ProcessAsync(CRequestBase* pRequest) {
 }
 
 void CWorkThread::Terminate() { 
-	m_bTerminate = true;
+	m_bTerminate.store(true, std::memory_order_release);
 	if (m_hThread != NULL) {
 		::SetEvent(m_wakeUp);
 		::WaitForSingleObject(m_hThread, 10000);
@@ -95,7 +95,7 @@ void CWorkThread::ThreadFunc(void* arg) {
 		int nNumUnprocessedRequests = 0;
 		std::list<CRequestBase*>::iterator iter;
 		for (iter = thisPtr->m_requestList.begin( ); iter != thisPtr->m_requestList.end( ); iter++ ) {
-			if ((*iter)->Processed == false) {
+			if (!(*iter)->Processed.load(std::memory_order_acquire)) {
 				requestHandled = *iter;
 				nNumUnprocessedRequests++;
 			}
@@ -106,7 +106,7 @@ void CWorkThread::ThreadFunc(void* arg) {
 		// process this request
 		if (requestHandled != NULL) {
 			thisPtr->ProcessRequest(*requestHandled);
-			requestHandled->Processed = true;
+			requestHandled->Processed.store(true, std::memory_order_release);
 
 			// signal end of processing
 			if (requestHandled->EventFinished != NULL) {
@@ -119,18 +119,18 @@ void CWorkThread::ThreadFunc(void* arg) {
 					}
 				}
 			}
-			if (!thisPtr->m_bTerminate) {
+			if (!thisPtr->m_bTerminate.load(std::memory_order_acquire)) {
 				thisPtr->AfterFinishProcess(*requestHandled);
 			}
 			nNumUnprocessedRequests--;
 		}
 
 		// if there are no more requests, sleep until woke up
-		if (nNumUnprocessedRequests == 0 && !thisPtr->m_bTerminate) {
+		if (nNumUnprocessedRequests == 0 && !thisPtr->m_bTerminate.load(std::memory_order_acquire)) {
 			::WaitForSingleObject(thisPtr->m_wakeUp, INFINITE);
 			::ResetEvent(thisPtr->m_wakeUp);
 		}
-	} while (!thisPtr->m_bTerminate);
+	} while (!thisPtr->m_bTerminate.load(std::memory_order_acquire));
 	if (thisPtr->m_bCoInitialize) {
 		::CoUninitialize();
 	}
@@ -141,7 +141,7 @@ void CWorkThread::DeleteAllRequestsMarkedForDeletion(CWorkThread* thisPtr) {
 	bool bDeleted = false;
 	std::list<CRequestBase*>::iterator iter;
 	for (iter = thisPtr->m_requestList.begin( ); iter != thisPtr->m_requestList.end( ); iter++ ) {
-		if ((*iter)->Deleted) {
+		if ((*iter)->Deleted.load(std::memory_order_acquire)) {
 			delete *iter;
 			thisPtr->m_requestList.erase(iter);
 			bDeleted = true;

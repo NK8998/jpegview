@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 // Base class for requests processed by a worker thread (i.e. an instance of CWorkThread class) 
 class CRequestBase {
 public:
@@ -23,8 +25,8 @@ public:
 	int Type; // Can be used to set the type of the request, default is 0
 	HANDLE EventFinished; // Event signaled when processing is finished
 	volatile LONG* EventFinishedCounter; // if not NULL, this counter is decremented after having handled the request and the event is not fired until it gets zero
-	volatile bool Processed; // Set to true when processing is finished
-	volatile bool Deleted; // Marks requests for deletion from the request queue
+	std::atomic<bool> Processed; // Set to true when processing is finished
+	std::atomic<bool> Deleted; // Marks requests for deletion from the request queue
 };
 
 
@@ -67,7 +69,7 @@ protected:
 	CRITICAL_SECTION m_csList; // the critical section protecting the request list (m_requestList)
 	HANDLE m_wakeUp; // wake up event for the tread (it sleeps while there is nothing to process)
 	HANDLE m_hThread; // working thread
-	volatile bool m_bTerminate; // flags termination for thread
+	std::atomic<bool> m_bTerminate; // flags termination for thread
 
 private:
 	static void  __cdecl ThreadFunc(void* arg);

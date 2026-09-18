@@ -27,7 +27,7 @@
 using namespace Gdiplus;
 
 // static initializers
-volatile int CImageLoadThread::m_curHandle = 0;
+std::atomic<int> CImageLoadThread::m_curHandle(0);
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // static helpers
@@ -245,12 +245,14 @@ CImageData CImageLoadThread::GetLoadedImage(int nHandle) {
 	std::list<CRequestBase*>::iterator iter;
 	for (iter = m_requestList.begin( ); iter != m_requestList.end( ); iter++ ) {
 		CRequest* pRequest = (CRequest*)(*iter);
-		if (pRequest->Processed && pRequest->Deleted == false && pRequest->RequestHandle == nHandle) {
+		if (pRequest->Processed.load(std::memory_order_acquire) &&
+			!pRequest->Deleted.load(std::memory_order_acquire) &&
+			pRequest->RequestHandle == nHandle) {
 			imageFound = pRequest->Image;
 			bFailedMemory = pRequest->OutOfMemory;
 			bFailedException = pRequest->ExceptionError;
 			// only mark as deleted
-			pRequest->Deleted = true;
+			pRequest->Deleted.store(true, std::memory_order_release);
 			break;
 		}
 	}
