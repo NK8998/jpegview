@@ -12,6 +12,21 @@ NOTE: You do _NOT_ need to rebuild libraries from scratch.  The pre-built librar
 
 NOTE: Re-built libraries do not match 1:1 with previous builds.  The compiler puts other information into the binaries so they won't ever match 100%
 
+### Windows ARM64
+
+`build-arm64.bat` rebuilds the native ARM64 dependency graph and JPEGView:
+
+```bat
+extras\scripts\build-arm64.bat all
+```
+
+It requires Visual Studio with the v142 ARM64 tools and ARM64 ATL component,
+Windows SDK 10.0.22621.0, CMake, Python 3, Meson, and Ninja. Individual targets
+such as `libjpeg`, `libpng`, `heifavif`, and `app` can be used while diagnosing
+a build. The S4 dependency builds deliberately disable x86-only assembly/SIMD
+in libjpeg-turbo, dav1d, and libde265; architecture-specific optimization is
+separate correctness work.
+
 ## keymap_*py
 
 These Python scripts are for maintenance of the `KeyMap.txt` in an automated fashion.
